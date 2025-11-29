@@ -52,9 +52,22 @@ public class VaultLootPredictor {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.world == null)
             return null;
-        return client.world.getRegistryManager().getOptional(RegistryKeys.LOOT_TABLE)
-                .orElse(null)
-                .get(RegistryKey.of(RegistryKeys.LOOT_TABLE, id));
+
+        // Try getting from client registry (unlikely to work for loot tables)
+        LootTable table = client.world.getRegistryManager().getOptional(RegistryKeys.LOOT_TABLE)
+                .map(reg -> reg.get(RegistryKey.of(RegistryKeys.LOOT_TABLE, id)))
+                .orElse(null);
+
+        if (table != null)
+            return table;
+
+        // Fallback: Try getting from Integrated Server (Singleplayer)
+        if (client.getServer() != null) {
+            return client.getServer().getReloadableRegistries()
+                    .getLootTable(RegistryKey.of(RegistryKeys.LOOT_TABLE, id));
+        }
+
+        return null;
     }
 
     private static List<ItemStack> generateSingleLoot(LootTable table, Random random) {
@@ -84,7 +97,7 @@ public class VaultLootPredictor {
             LootPoolEntry entry = entries.get(index);
 
             if (entry instanceof ItemEntry) {
-                Item item = ((ItemEntryAccessor) entry).getItem();
+                Item item = ((ItemEntryAccessor) entry).getItem().value();
                 items.add(new ItemStack(item));
             }
         }
